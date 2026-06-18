@@ -205,4 +205,4 @@ sudo sysctl -w net.ipv4.ip_forward=0
 | `port_infer.py` | Stage 1: Infers active NAT source ports |
 | `common.h` | Shared configuration, helper functions, packet-generation routines, and sniffing utilities |
 | `attack_s.cpp` | Implementation of the attack |
-| `Makefile` | Builds `attack_s` and `attack_p` |
+| `Makefile` | Builds `attack_s` |
