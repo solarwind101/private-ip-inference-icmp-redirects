@@ -6,19 +6,19 @@ This tool infers the private IP addresses of clients behind a NAT that have acti
 
 The attack operates in two stages:
 
-### Stage 1 — Port Inference (`port_infer.py`)
+### Stage 1 - Port Inference (`port_infer.py`)
 
 Identifies which ephemeral source ports on the NAT are currently in use by active TCP connections to the target server.
 
-### Stage 2 — IP Inference and ICMP Redirect (`attack_s`)
+### Stage 2 - IP Inference and ICMP Redirect (`attack_s`)
 
 For each active port, the attack divides the candidate private-IP subnet into blocks and probes each block using spoofed RST packets followed by a SYN probe. A Challenge ACK (c-ACK) response from the server identifies the block containing the active client and reveals the correct TCP sequence number. An ICMP Redirect (Type 5, Code 1) packet is then sent to every IP address in the identified block, causing the real client to reroute its traffic through the attacker.
 
 ### NAT Behaviors Exploited
 
-- **Port Preservation** — The NAT preserves the client's ephemeral source port on the WAN side.
-- **No TCP Window Tracking for RST Packets** — The NAT forwards spoofed RST packets regardless of sequence number.
-- **No Reverse-Path Validation** — The NAT forwards packets from LAN IP addresses that it does not own.
+- **Port Preservation** - The NAT preserves the client's ephemeral source port on the WAN side.
+- **No TCP Window Tracking for RST Packets** - The NAT forwards spoofed RST packets regardless of sequence number.
+- **No Reverse-Path Validation** - The NAT forwards packets from LAN IP addresses that it does not own.
 
 ---
 
@@ -54,13 +54,13 @@ sudo apt install libpcap-dev
 
 libtins is a high-level C++ library for packet crafting and packet sniffing.
 
-**Option A — Install from the package manager (if available):**
+**Option A - Install from the package manager (if available):**
 
 ```bash
 sudo apt install libtins-dev
 ```
 
-**Option B — Build from source:**
+**Option B - Build from source:**
 
 ```bash
 sudo apt install cmake libpcap-dev libssl-dev
@@ -120,7 +120,7 @@ This produces the`attack_s` binary.
 
 ## Execution
 
-### Step 1 — Configure `port_infer.py`
+### Step 1 - Configure `port_infer.py`
 
 Edit the configuration section at the top of `port_infer.py`:
 
@@ -132,7 +132,7 @@ SERVER_PORT = 22              # Target server port
 nat_ip      = "1.2.3.4"       # NAT public (WAN) IP address
 ```
 
-### Step 2 — Infer Active NAT Ports
+### Step 2 - Infer Active NAT Ports
 
 ```bash
 sudo python3 port_infer.py --live
@@ -146,7 +146,7 @@ Save the output to a file with one port per line:
 60000
 ```
 
-### Step 3 — Suppress Kernel RST Responses
+### Step 3 - Suppress Kernel RST Responses
 
 The attacker opens raw sockets for SYN probes. Without the following rule, the kernel may automatically send RST packets in response to received SYN-ACKs, disrupting the probe process.
 
@@ -154,7 +154,7 @@ The attacker opens raw sockets for SYN probes. Without the following rule, the k
 sudo iptables -A OUTPUT -p tcp --tcp-flags RST RST -j DROP
 ```
 
-### Step 4 — Run the Attack
+### Step 4 - Run the Attack
 
 ```bash
 sudo ./attack_s --ports ports.txt --subnet 24
@@ -166,13 +166,13 @@ sudo ./attack_s --ports ports.txt --subnet 24
 |----------|-------------|----------|
 | `--ports <file>` | File containing one active port per line | Required |
 | `--subnet <prefix>` | CIDR prefix to enumerate (e.g., `24`) | Required |
-| `--hosts <file>` | CSV file (`MAC,IP`) instead of subnet enumeration | — |
+| `--hosts <file>` | CSV file (`MAC,IP`) instead of subnet enumeration | - |
 | `--block <k>` | Number of IPs per block | `10` |
 | `--nat-wait <s>` | Seconds to wait after the RST flood for NAT cleanup | `11` |
 | `--syn-wait <s>` | Seconds to wait for a server response after SYN | `1` |
 | `--block-wait <s>` | Pause between blocks when no response is observed (sequential mode only) | `1` |
 
-### Step 5 — Enable IP Forwarding (Optional)
+### Step 5 - Enable IP Forwarding (Optional)
 
 To forward intercepted traffic to the real server:
 
@@ -189,7 +189,7 @@ ip route get <SERVER_IP>
 
 The output should show a route through the legitimate gateway.
 
-### Step 6 — Cleanup
+### Step 6 - Cleanup
 
 ```bash
 sudo iptables -D OUTPUT -p tcp --tcp-flags RST RST -j DROP

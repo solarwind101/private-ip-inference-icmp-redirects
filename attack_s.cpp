@@ -1,5 +1,5 @@
 /*
- * attack_s.cpp  —  sequential version (block-sequential, all ports parallel within block)
+ * attack_s.cpp 
  *
  * NOTE: suppress kernel RST responses before running:
  *   sudo iptables -A OUTPUT -p tcp --tcp-flags RST RST -j DROP
